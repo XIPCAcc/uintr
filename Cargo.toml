@@ -1,0 +1,25 @@
+[package]
+name = "uintr-test"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[lib]
+name = "uintr_test"
+path = "src/lib.rs"
+
+[[bin]]
+name = "uintr-server"
+path = "src/server.rs"
+
+[[bin]]
+name = "uintr-client"
+path = "src/client.rs"
+
+[dependencies]
+tokio = { version = "1.38", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
+libc = "0.2"
+
+[build-dependencies]
+cc = "1.0"
