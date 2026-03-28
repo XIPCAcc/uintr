@@ -9,9 +9,7 @@ use std::time::Duration;
 use uintr::{
     UintrError, UintrResult,
     syscall::{uintr_register_handler, uintr_create_fd, uintr_register_sender, senduipi, stui, uintr_wait},
-    interrupt::{init_token, process_uintr_wakers},
-    async_wait::uintr_wait as async_uintr_wait,
-    comm::setup_server_connection,
+    connection::setup_server_connection,
     benchmark::Benchmarks,
     UINTR_HANDLER_FLAG_WAITING_ANY, UINTR_WAIT_MAX_USEC,
 };
@@ -49,9 +47,6 @@ fn set_server_uipi_index(index: libc::c_int) {
 
 // 服务器设置
 async fn setup_server() -> UintrResult<()> {
-    // 初始化 UintrToken
-    init_token();
-
     // 注册中断处理程序
     let res = uintr_register_handler(ui_handler, UINTR_HANDLER_FLAG_WAITING_ANY)?;
     println!("Server: Interrupt handler registered successfully: {}", res);

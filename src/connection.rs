@@ -1,6 +1,6 @@
-// 通信模块
+// 连接模块
 // 
-// 这个模块提供了通过Unix Domain Socket进行文件描述符传递的功能
+// 这个模块提供了服务器和客户端之间的连接建立和文件描述符传递功能
 
 use std::os::unix::io::{RawFd, AsRawFd};
 use std::os::unix::net::{UnixListener, UnixStream};

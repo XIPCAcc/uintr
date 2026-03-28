@@ -5,15 +5,12 @@
 
 pub mod syscall;
 pub mod interrupt;
-pub mod async_wait;
-pub mod comm;
+pub mod connection;
 pub mod benchmark;
 
 // 重新导出常用的类型和函数
 pub use syscall::{UintrFrame, senduipi, stui, clui, uiret};
-pub use interrupt::{UintrToken, UintrFuture, uintr};
-pub use async_wait::{uintr_wait, UintrWait};
-pub use comm::{send_fd, recv_fd, setup_server_connection, setup_client_connection};
+pub use connection::{send_fd, recv_fd, setup_server_connection, setup_client_connection};
 pub use benchmark::{Benchmarks, BenchmarkResult};
 
 // ============================================================================

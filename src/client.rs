@@ -8,8 +8,7 @@ use std::os::unix::io::RawFd;
 use uintr::{
     UintrError, UintrResult,
     syscall::{uintr_register_handler, uintr_create_fd, uintr_register_sender, senduipi, stui, uintr_wait},
-    interrupt::init_token,
-    comm::setup_client_connection,
+    connection::setup_client_connection,
     UINTR_HANDLER_FLAG_WAITING_ANY, UINTR_WAIT_MAX_USEC,
 };
 
@@ -45,9 +44,6 @@ fn set_client_uipi_index(index: libc::c_int) {
 
 // 客户端设置
 async fn setup_client() -> UintrResult<()> {
-    // 初始化 UintrToken
-    init_token();
-
     // 注册中断处理程序
     let res = uintr_register_handler(ui_handler, UINTR_HANDLER_FLAG_WAITING_ANY)?;
     println!("Client: Interrupt handler registered successfully: {}", res);

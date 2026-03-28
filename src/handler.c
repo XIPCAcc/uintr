@@ -12,17 +12,6 @@
 #include <stdbool.h>
 
 // ============================================================================
-// 系统调用号
-// ============================================================================
-
-#define __NR_uintr_register_handler 471
-#define __NR_uintr_unregister_handler 472
-#define __NR_uintr_create_fd 473
-#define __NR_uintr_register_sender 474
-#define __NR_uintr_unregister_sender 475
-#define __NR_uintr_wait 476
-
-// ============================================================================
 // 数据结构
 // ============================================================================
 
@@ -88,16 +77,4 @@ int get_uintr_received(void) {
  */
 void set_uintr_received(int value) {
     uintr_received = value;
-}
-
-/**
- * UINTR等待系统调用包装函数
- * 
- * @param usec 超时时间（微秒）
- * @param flags 标志位
- * @return 成功返回true，失败返回false
- */
-bool uintr_wait(long usec, int flags) {
-    long result = syscall(__NR_uintr_wait, usec, flags);
-    return result == 0;
 }
