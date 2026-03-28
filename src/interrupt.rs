@@ -7,23 +7,17 @@ use std::sync::Mutex;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
-use crate::{UintrError, UintrResult, SERVER_TOKEN, CLIENT_TOKEN};
+use crate::{UintrError, UintrResult};
 
 // ============================================================================
 // 全局状态
 // ============================================================================
 
-/// 服务器UintrToken实例
-static mut SERVER_TOKEN_OBJ: Option<UintrToken> = None;
+/// UintrToken实例
+static mut TOKEN_OBJ: Option<UintrToken> = None;
 
-/// 客户端UintrToken实例
-static mut CLIENT_TOKEN_OBJ: Option<UintrToken> = None;
-
-/// 服务器初始化标志
-static mut SERVER_INITIALIZED: bool = false;
-
-/// 客户端初始化标志
-static mut CLIENT_INITIALIZED: bool = false;
+/// 初始化标志
+static mut INITIALIZED: bool = false;
 
 // ============================================================================
 // 数据结构
@@ -117,50 +111,25 @@ pub async fn uintr(token: UintrToken) -> UintrResult<()> {
     UintrFuture { token }.await
 }
 
-/// 初始化服务器UintrToken
+/// 初始化UintrToken
 /// 
-/// 这个函数必须在服务器启动时调用，用于初始化服务器的中断状态
-pub fn init_server_token() {
+/// 这个函数必须在启动时调用，用于初始化中断状态
+pub fn init_token() {
     unsafe {
-        SERVER_TOKEN_OBJ = Some(UintrToken::new("SERVER"));
-        SERVER_INITIALIZED = true;
+        TOKEN_OBJ = Some(UintrToken::new("UINTR"));
+        INITIALIZED = true;
     }
 }
 
-/// 初始化客户端UintrToken
-/// 
-/// 这个函数必须在客户端启动时调用，用于初始化客户端的中断状态
-pub fn init_client_token() {
-    unsafe {
-        CLIENT_TOKEN_OBJ = Some(UintrToken::new("CLIENT"));
-        CLIENT_INITIALIZED = true;
-    }
-}
-
-/// 获取服务器UintrToken
+/// 获取UintrToken
 /// 
 /// # 返回
 /// 
 /// 成功返回UintrToken实例，失败返回NotInitialized错误
-pub fn get_server_token() -> UintrResult<UintrToken> {
+pub fn get_token() -> UintrResult<UintrToken> {
     unsafe {
-        if SERVER_INITIALIZED {
-            Ok(SERVER_TOKEN_OBJ.as_ref().expect("SERVER_TOKEN_OBJ not initialized").clone())
-        } else {
-            Err(UintrError::NotInitialized)
-        }
-    }
-}
-
-/// 获取客户端UintrToken
-/// 
-/// # 返回
-/// 
-/// 成功返回UintrToken实例，失败返回NotInitialized错误
-pub fn get_client_token() -> UintrResult<UintrToken> {
-    unsafe {
-        if CLIENT_INITIALIZED {
-            Ok(CLIENT_TOKEN_OBJ.as_ref().expect("CLIENT_TOKEN_OBJ not initialized").clone())
+        if INITIALIZED {
+            Ok(TOKEN_OBJ.as_ref().expect("TOKEN_OBJ not initialized").clone())
         } else {
             Err(UintrError::NotInitialized)
         }
@@ -178,28 +147,15 @@ pub fn get_client_token() -> UintrResult<UintrToken> {
 /// # 参数
 /// 
 /// * `_handler_name` - 处理程序名称（未使用）
-/// * `vector` - 中断向量号
+/// * `vector` - 中断向量号（未使用）
 #[no_mangle]
-pub extern "C" fn rust_interrupt_callback(_handler_name: *const libc::c_char, vector: u64) {
+pub extern "C" fn rust_interrupt_callback(_handler_name: *const libc::c_char, _vector: u64) {
     unsafe {
-        match vector {
-            SERVER_TOKEN => {
-                if SERVER_INITIALIZED {
-                    if let Some(ref token) = SERVER_TOKEN_OBJ {
-                        let mut pending = token.inner.pending.lock().unwrap();
-                        *pending = true;
-                    }
-                }
+        if INITIALIZED {
+            if let Some(ref token) = TOKEN_OBJ {
+                let mut pending = token.inner.pending.lock().unwrap();
+                *pending = true;
             }
-            CLIENT_TOKEN => {
-                if CLIENT_INITIALIZED {
-                    if let Some(ref token) = CLIENT_TOKEN_OBJ {
-                        let mut pending = token.inner.pending.lock().unwrap();
-                        *pending = true;
-                    }
-                }
-            }
-            _ => {}
         }
     }
 }
@@ -218,16 +174,9 @@ pub extern "C" fn rust_interrupt_callback(_handler_name: *const libc::c_char, ve
 #[no_mangle]
 pub extern "C" fn check_uintr_pending() -> bool {
     unsafe {
-        let server_pending = SERVER_TOKEN_OBJ.as_ref().map(|token| {
+        TOKEN_OBJ.as_ref().map(|token| {
             *token.inner.pending.lock().unwrap()
-        }).unwrap_or(false);
-        
-        let client_pending = CLIENT_TOKEN_OBJ.as_ref().map(|token| {
-            *token.inner.pending.lock().unwrap()
-        }).unwrap_or(false);
-        
-        let has_pending = server_pending || client_pending;
-        has_pending
+        }).unwrap_or(false)
     }
 }
 
@@ -243,21 +192,7 @@ pub extern "C" fn process_uintr_wakers() -> u32 {
     unsafe {
         let mut waker_count = 0;
         
-        if let Some(ref token) = SERVER_TOKEN_OBJ {
-            let should_wake = {
-                let pending = token.inner.pending.lock().unwrap();
-                *pending
-            };
-            
-            if should_wake {
-                if let Some(waker) = token.inner.waker.lock().unwrap().take() {
-                    waker.wake();
-                    waker_count += 1;
-                }
-            }
-        }
-        
-        if let Some(ref token) = CLIENT_TOKEN_OBJ {
+        if let Some(ref token) = TOKEN_OBJ {
             let should_wake = {
                 let pending = token.inner.pending.lock().unwrap();
                 *pending

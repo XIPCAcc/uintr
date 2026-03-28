@@ -12,7 +12,7 @@ pub mod benchmark;
 // 重新导出常用的类型和函数
 pub use syscall::{UintrFrame, senduipi, stui, clui, uiret};
 pub use interrupt::{UintrToken, UintrFuture, uintr};
-pub use async_wait::{ServerUintrWait, ClientUintrWait};
+pub use async_wait::{uintr_wait, UintrWait};
 pub use comm::{send_fd, recv_fd, setup_server_connection, setup_client_connection};
 pub use benchmark::{Benchmarks, BenchmarkResult};
 
@@ -48,11 +48,8 @@ pub const UINTR_HANDLER_FLAG_WAITING_ANY: libc::c_int = 0x3000;
 /// UINTR等待超时时间（微秒）
 pub const UINTR_WAIT_MAX_USEC: libc::c_long = 10_000_000; // 10 seconds
 
-/// 服务器中断向量
-pub const SERVER_TOKEN: u64 = 0;
-
-/// 客户端中断向量
-pub const CLIENT_TOKEN: u64 = 1;
+/// UINTR中断向量（服务器和客户端都使用0）
+pub const UINTR_VECTOR: u64 = 0;
 
 // 错误类型
 #[derive(Debug)]

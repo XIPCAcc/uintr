@@ -1,7 +1,7 @@
 /**
  * UINTR Handler - 用户态中断处理程序
  * 
- * 这个文件提供了服务器和客户端的中断处理程序实现
+ * 这个文件提供了统一的中断处理程序实现
  */
 
 #include <stdint.h>
@@ -36,21 +36,11 @@ typedef struct {
 } UintrFrame;
 
 // ============================================================================
-// 常量定义
-// ============================================================================
-
-/** 服务器中断向量 */
-#define SERVER_TOKEN 0
-
-/** 客户端中断向量 */
-#define CLIENT_TOKEN 1
-
-// ============================================================================
 // 全局状态
 // ============================================================================
 
 /** 中断接收标志 */
-volatile unsigned long uintr_received[2] = {0, 0};
+volatile unsigned long uintr_received = 0;
 
 // ============================================================================
 // 外部函数声明
@@ -64,33 +54,18 @@ extern void rust_interrupt_callback(const char* handler_name, uint64_t vector);
 // ============================================================================
 
 /**
- * 服务器中断处理程序
+ * 统一的中断处理程序
  * 
- * 这个函数在服务器收到用户态中断时被调用
+ * 这个函数在收到用户态中断时被调用
  * 
  * @param _ui_frame UINTR栈帧（未使用）
- * @param vector 中断向量号
+ * @param vector 中断向量号（未使用，固定为0）
  */
 void __attribute__ ((interrupt))
      __attribute__((target("general-regs-only", "inline-all-stringops")))
-     server_ui_handler(UintrFrame* _ui_frame __attribute__((unused)), uint64_t vector) {
-    uintr_received[vector] = 1;
-    rust_interrupt_callback("server", vector);
-}
-
-/**
- * 客户端中断处理程序
- * 
- * 这个函数在客户端收到用户态中断时被调用
- * 
- * @param _ui_frame UINTR栈帧（未使用）
- * @param vector 中断向量号
- */
-void __attribute__ ((interrupt))
-     __attribute__((target("general-regs-only", "inline-all-stringops")))
-     client_ui_handler(UintrFrame* _ui_frame __attribute__((unused)), uint64_t vector) {
-    uintr_received[vector] = 1;
-    rust_interrupt_callback("client", vector);
+     ui_handler(UintrFrame* _ui_frame __attribute__((unused)), uint64_t vector __attribute__((unused))) {
+    uintr_received = 1;
+    // rust_interrupt_callback(NULL, 0);
 }
 
 // ============================================================================
@@ -98,39 +73,21 @@ void __attribute__ ((interrupt))
 // ============================================================================
 
 /**
- * 获取服务器中断标志
+ * 获取中断标志
  * 
- * @return 服务器中断标志（0或1）
+ * @return 中断标志（0或1）
  */
-int get_server_uintr_received(void) {
-    return uintr_received[SERVER_TOKEN];
+int get_uintr_received(void) {
+    return uintr_received;
 }
 
 /**
- * 获取客户端中断标志
- * 
- * @return 客户端中断标志（0或1）
- */
-int get_client_uintr_received(void) {
-    return uintr_received[CLIENT_TOKEN];
-}
-
-/**
- * 设置服务器中断标志
+ * 设置中断标志
  * 
  * @param value 要设置的值（0或1）
  */
-void set_server_uintr_received(int value) {
-    uintr_received[SERVER_TOKEN] = value;
-}
-
-/**
- * 设置客户端中断标志
- * 
- * @param value 要设置的值（0或1）
- */
-void set_client_uintr_received(int value) {
-    uintr_received[CLIENT_TOKEN] = value;
+void set_uintr_received(int value) {
+    uintr_received = value;
 }
 
 /**

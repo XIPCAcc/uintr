@@ -5,17 +5,18 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::os::unix::io::RawFd;
-use uintr_test::{
+use uintr::{
     UintrError, UintrResult,
     syscall::{uintr_register_handler, uintr_create_fd, uintr_register_sender, senduipi, stui, uintr_wait},
-    interrupt::init_client_token,
+    interrupt::init_token,
     comm::setup_client_connection,
     UINTR_HANDLER_FLAG_WAITING_ANY, UINTR_WAIT_MAX_USEC,
 };
 
-// 声明C语言中断处理程序
+// 声明C语言中断处理程序和全局变量
 unsafe extern "C" {
-    pub fn client_ui_handler(ui_frame: *mut uintr_test::syscall::UintrFrame, vector: u64);
+    pub fn ui_handler(ui_frame: *mut uintr::syscall::UintrFrame, vector: u64);
+    static mut uintr_received: libc::c_ulong;
 }
 
 // 全局状态
@@ -44,18 +45,18 @@ fn set_client_uipi_index(index: libc::c_int) {
 
 // 客户端设置
 async fn setup_client() -> UintrResult<()> {
-    // 初始化客户端 UintrToken
-    init_client_token();
+    // 初始化 UintrToken
+    init_token();
 
-    // 注册客户端中断处理程序
-    let res = uintr_register_handler(client_ui_handler, UINTR_HANDLER_FLAG_WAITING_ANY)?;
+    // 注册中断处理程序
+    let res = uintr_register_handler(ui_handler, UINTR_HANDLER_FLAG_WAITING_ANY)?;
     println!("Client: Interrupt handler registered successfully: {}", res);
 
-    // 创建客户端uintrfd文件描述符 - 使用向量1（CLIENT_TOKEN）
-    let client_descriptor = uintr_create_fd(1, 0)?;
+    // 创建客户端uintrfd文件描述符 - 使用向量0
+    let client_descriptor = uintr_create_fd(0, 0)?;
     set_client_uintrfd(client_descriptor);
     println!(
-        "Client: Created uintrfd with descriptor {} (vector 1)",
+        "Client: Created uintrfd with descriptor {} (vector 0)",
         client_descriptor
     );
 
@@ -104,7 +105,10 @@ async fn client_communicate(args: Arguments, test_done: Arc<AtomicBool>) -> Uint
     while message_count < args.count && !test_done.load(std::sync::atomic::Ordering::Acquire) {
         println!("Client: Waiting for message #{}", message_count + 1);
         // 等待来自服务端的中断
-        uintr_wait(UINTR_WAIT_MAX_USEC, 0)?;
+        while unsafe { uintr_received == 0 } {
+            uintr_wait(UINTR_WAIT_MAX_USEC, 0)?;
+        }
+        unsafe { uintr_received = 0; }
         println!("Client: Received message #{}", message_count + 1);
         // 发送响应中断
         uintrfd_notify(uipi_index)?;

@@ -6,19 +6,20 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::os::unix::io::RawFd;
 use std::time::Duration;
-use uintr_test::{
+use uintr::{
     UintrError, UintrResult,
-    syscall::{uintr_register_handler, uintr_create_fd, uintr_register_sender, senduipi, stui},
-    interrupt::{init_server_token, process_uintr_wakers},
-    async_wait::server_uintr_wait,
+    syscall::{uintr_register_handler, uintr_create_fd, uintr_register_sender, senduipi, stui, uintr_wait},
+    interrupt::{init_token, process_uintr_wakers},
+    async_wait::uintr_wait as async_uintr_wait,
     comm::setup_server_connection,
     benchmark::Benchmarks,
-    UINTR_HANDLER_FLAG_WAITING_ANY,
+    UINTR_HANDLER_FLAG_WAITING_ANY, UINTR_WAIT_MAX_USEC,
 };
 
-// 声明C语言中断处理程序
+// 声明C语言中断处理程序和全局变量
 unsafe extern "C" {
-    pub fn server_ui_handler(ui_frame: *mut uintr_test::syscall::UintrFrame, vector: u64);
+    pub fn ui_handler(ui_frame: *mut uintr::syscall::UintrFrame, vector: u64);
+    static mut uintr_received: libc::c_ulong;
 }
 
 // 全局状态
@@ -48,11 +49,11 @@ fn set_server_uipi_index(index: libc::c_int) {
 
 // 服务器设置
 async fn setup_server() -> UintrResult<()> {
-    // 初始化服务器 UintrToken
-    init_server_token();
+    // 初始化 UintrToken
+    init_token();
 
-    // 注册服务器中断处理程序
-    let res = uintr_register_handler(server_ui_handler, UINTR_HANDLER_FLAG_WAITING_ANY)?;
+    // 注册中断处理程序
+    let res = uintr_register_handler(ui_handler, UINTR_HANDLER_FLAG_WAITING_ANY)?;
     println!("Server: Interrupt handler registered successfully: {}", res);
 
     // 创建服务器uintrfd文件描述符 - 使用向量0（SERVER_TOKEN）
@@ -122,8 +123,11 @@ async fn server_communicate(args: Arguments) -> UintrResult<()> {
         uintrfd_notify(uipi_index)?;
         
         // 等待响应
-        server_uintr_wait().await?;
-
+        // async_uintr_wait().await?;
+        while unsafe { uintr_received == 0 } {
+            uintr_wait(UINTR_WAIT_MAX_USEC, 0)?;
+        }
+        unsafe { uintr_received = 0; }
         // 结束测量单个操作并更新统计
         bench.end_operation();
     }
@@ -175,7 +179,7 @@ async fn main() -> UintrResult<()> {
                 println!("Periodic wakeup: count={}", count);
             }
             // 调用process_uintr_wakers来处理中断
-            process_uintr_wakers();
+            // process_uintr_wakers();
         }
     });
 

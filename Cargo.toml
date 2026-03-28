@@ -1,12 +1,12 @@
 [package]
-name = "uintr-test"
+name = "uintr"
 version = "0.1.0"
 edition = "2021"
 
 [workspace]
 
 [lib]
-name = "uintr_test"
+name = "uintr"
 path = "src/lib.rs"
 
 [[bin]]
