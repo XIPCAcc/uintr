@@ -3,8 +3,6 @@ name = "uintr"
 version = "0.1.0"
 edition = "2021"
 
-[workspace]
-
 [lib]
 name = "uintr"
 path = "src/lib.rs"
