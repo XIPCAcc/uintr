@@ -4,7 +4,7 @@
 // 可以被外部crate直接使用
 
 pub mod syscall;
-pub mod interrupt;
+pub mod handler;
 pub mod connection;
 pub mod benchmark;
 

@@ -18,4 +18,5 @@
 pub extern "C" fn rust_interrupt_callback(_handler_name: *const libc::c_char, _vector: u64) {
     // 目前不需要在 Rust 中做任何事情
     // 中断标志由 C 代码的 uintr_received 变量管理
+    println!("Interrupt received");
 }
