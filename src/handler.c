@@ -54,7 +54,7 @@ void __attribute__ ((interrupt))
      __attribute__((target("general-regs-only", "inline-all-stringops")))
      ui_handler(UintrFrame* _ui_frame __attribute__((unused)), uint64_t vector __attribute__((unused))) {
     uintr_received = 1;
-    rust_interrupt_callback(NULL, 0);
+    rust_interrupt_callback(NULL, vector);
 }
 
 // ============================================================================

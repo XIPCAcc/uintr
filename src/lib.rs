@@ -7,6 +7,7 @@ pub mod syscall;
 pub mod handler;
 pub mod connection;
 pub mod benchmark;
+pub mod async_wait;
 
 // 重新导出常用的类型和函数
 pub use syscall::{UintrFrame, senduipi, stui, clui, uiret};

@@ -1,22 +1,20 @@
-// 中断处理模块
-// 
-// 这个模块提供了中断处理的核心功能
+use libc::c_char;
+use crate::async_wait::UintrToken;
 
-// ============================================================================
-// C回调函数
-// ============================================================================
-
-/// Rust回调函数，供C代码调用
-/// 
-/// 这个函数在中断处理程序中被调用
-/// 
-/// # 参数
-/// 
-/// * `_handler_name` - 处理程序名称（未使用）
-/// * `vector` - 中断向量号（未使用）
 #[no_mangle]
-pub extern "C" fn rust_interrupt_callback(_handler_name: *const libc::c_char, _vector: u64) {
-    // 目前不需要在 Rust 中做任何事情
-    // 中断标志由 C 代码的 uintr_received 变量管理
-    println!("Interrupt received");
+pub extern "C" fn rust_interrupt_callback(_handler_name: *const c_char, _vector: u64) {
+    unsafe {
+        if let Some(ref token) = TOKEN {
+            token.set_pending();
+        }
+    }
 }
+
+static mut TOKEN: Option<UintrToken> = None;
+
+pub fn set_handler_token(token: UintrToken) {
+    unsafe {
+        TOKEN = Some(token);
+    }
+}
+
