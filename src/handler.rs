@@ -1,5 +1,5 @@
 use libc::c_char;
-use crate::async_wait::UintrToken;
+use uintr_core::UintrToken;
 
 #[no_mangle]
 pub extern "C" fn rust_interrupt_callback(_handler_name: *const c_char, _vector: u64) {
