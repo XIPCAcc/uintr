@@ -1,7 +1,7 @@
-use std::sync::atomic::AtomicBool;
 use std::task::{Context, Poll};
 use std::pin::Pin;
 use std::future::Future;
+use std::sync::atomic::Ordering;
 
 use crate::UintrResult;
 use crate::UintrError;
@@ -17,14 +17,24 @@ impl Future for UintrFuture {
     type Output = UintrResult<()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut pending = self.token.inner.pending.lock().unwrap();
-        if *pending {
-            *pending = false;
-            Poll::Ready(Ok(()))
-        } else {
-            *self.token.inner.waker.lock().unwrap() = Some(cx.waker().clone());
-            Poll::Pending
+        let seq = self.token.inner.seq.load(Ordering::Acquire);
+        let consumed = self.token.inner.consumed_seq.load(Ordering::Acquire);
+
+        if seq != consumed {
+            self.token.inner.consumed_seq.store(seq, Ordering::Release);
+            return Poll::Ready(Ok(()));
         }
+
+        *self.token.inner.waker.lock().unwrap() = Some(cx.waker().clone());
+
+        let seq = self.token.inner.seq.load(Ordering::Acquire);
+        let consumed = self.token.inner.consumed_seq.load(Ordering::Acquire);
+        if seq != consumed {
+            self.token.inner.consumed_seq.store(seq, Ordering::Release);
+            return Poll::Ready(Ok(()));
+        }
+
+        Poll::Pending
     }
 }
 
