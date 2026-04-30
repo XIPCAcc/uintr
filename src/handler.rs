@@ -1,11 +1,13 @@
 use libc::c_char;
-use uintr_core::UintrToken;
+use uintr_core::{notify_global_uintr, UintrToken};
 
 #[no_mangle]
 pub extern "C" fn rust_interrupt_callback(_handler_name: *const c_char, _vector: u64) {
-    unsafe {
-        if let Some(ref token) = TOKEN {
-            token.set_pending();
+    if notify_global_uintr().is_err() {
+        unsafe {
+            if let Some(ref token) = TOKEN {
+                token.set_pending();
+            }
         }
     }
 }
@@ -17,4 +19,3 @@ pub fn set_handler_token(token: UintrToken) {
         TOKEN = Some(token);
     }
 }
-
