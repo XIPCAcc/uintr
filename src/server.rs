@@ -91,7 +91,7 @@ async fn server_communicate(args: Arguments) -> UintrResult<()> {
     let socket_path = "/tmp/uintr.sock";
     let _ = std::fs::remove_file(socket_path);
     
-    let client_fd = setup_server_connection(socket_path, get_server_uintrfd()).await?;
+    let client_fd = setup_server_connection(socket_path, get_server_uintrfd())?;
     println!("Server: Received client file descriptor {}", client_fd);
 
     // 注册发送者

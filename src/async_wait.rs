@@ -7,7 +7,7 @@ use crate::UintrResult;
 use crate::UintrError;
 use crate::handler::set_handler_token;
 
-pub use uintr_core::{UintrToken};
+pub use uintr_core::{UintrToken, process_global_uintr_wakers, get_notify_count, get_wake_count};
 
 pub struct UintrFuture {
     token: UintrToken,

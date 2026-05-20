@@ -86,7 +86,7 @@ async fn client_communicate(args: Arguments, test_done: Arc<AtomicBool>) -> Uint
 
     // 连接到server的Unix Domain Socket
     let socket_path = "/tmp/uintr.sock";
-    let server_fd = setup_client_connection(socket_path, get_client_uintrfd()).await?;
+    let server_fd = setup_client_connection(socket_path, get_client_uintrfd())?;
     println!("Client: Received server file descriptor {}", server_fd);
 
     // 注册发送者

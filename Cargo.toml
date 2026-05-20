@@ -19,6 +19,7 @@ path = "src/client.rs"
 uintr-core = { path = "../uintr-core" }
 tokio = { version = "1.38", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
 libc = "0.2"
+tracing = "0.1"
 
 [build-dependencies]
 cc = "1.0"

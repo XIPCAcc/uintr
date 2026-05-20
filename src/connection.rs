@@ -4,7 +4,6 @@
 
 use std::os::unix::io::{RawFd, AsRawFd};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::time::Duration;
 use crate::{UintrError, UintrResult};
 
 /// 通过Unix Domain Socket发送文件描述符
@@ -113,54 +112,30 @@ impl ServerConnection {
         }
     }
     
-    /// 等待客户端连接并交换文件描述符
-    pub async fn wait_for_client(&mut self, socket_path: &str) -> UintrResult<RawFd> {
+    /// 等待客户端连接并交换文件描述符（同步阻塞）
+    pub fn wait_for_client(&mut self, socket_path: &str) -> UintrResult<RawFd> {
         println!("wait_for_client: 开始等待客户端连接，socket 路径: {}", socket_path);
         
         let listener = UnixListener::bind(socket_path).map_err(|e| {
-            println!("wait_for_client: 绑定 socket 失败: {}", e);
             UintrError::SocketError(format!("Failed to bind socket: {}", e))
         })?;
-        
         println!("wait_for_client: 成功绑定 socket");
-        
-        listener.set_nonblocking(true).map_err(|e| {
-            UintrError::SocketError(format!("Failed to set nonblocking: {}", e))
+
+        let (stream, _) = listener.accept().map_err(|e| {
+            UintrError::SocketError(format!("Failed to accept: {}", e))
         })?;
-        
-        // 等待客户端连接
-        for i in 0..1000 {
-            match listener.accept() {
-                Ok((s, _)) => {
-                    println!("wait_for_client: 客户端已连接，尝试次数: {}", i + 1);
-                    self.client_socket = Some(s);
-                    break;
-                }
-                Err(e) => {
-                    if i % 100 == 0 {
-                        println!("wait_for_client: 等待客户端连接... (尝试次数: {}), 错误: {}", i + 1, e);
-                    }
-                    tokio::time::sleep(Duration::from_millis(50)).await;
-                }
-            }
-        }
-        
-        let socket = self.client_socket.as_ref().ok_or_else(|| {
-            println!("wait_for_client: 等待客户端连接超时");
-            UintrError::Timeout
-        })?;
-        
-        println!("wait_for_client: 接收客户端文件描述符...");
-        // 接收client的文件描述符
+        self.client_socket = Some(stream);
+        println!("wait_for_client: 客户端已连接");
+
+        let socket = self.client_socket.as_ref().unwrap();
+
         let client_fd = recv_fd(socket)?;
         println!("wait_for_client: 已接收客户端文件描述符: {}", client_fd);
         self.client_fd = Some(client_fd);
-        
-        println!("wait_for_client: 发送服务器文件描述符: {}", self.server_fd);
-        // 发送server的文件描述符给client
+
         send_fd(socket, self.server_fd)?;
-        println!("wait_for_client: 已发送服务器文件描述符");
-        
+        println!("wait_for_client: 已发送服务器文件描述符: {}", self.server_fd);
+
         Ok(client_fd)
     }
 }
@@ -181,61 +156,35 @@ impl ClientConnection {
         }
     }
     
-    /// 连接到服务器并交换文件描述符
-    pub async fn connect_to_server(&mut self, socket_path: &str) -> UintrResult<RawFd> {
+    /// 连接到服务器并交换文件描述符（同步阻塞）
+    pub fn connect_to_server(&mut self, socket_path: &str) -> UintrResult<RawFd> {
         println!("connect_to_server: 开始连接到服务器，socket 路径: {}", socket_path);
-        
-        // 连接到server的Unix Domain Socket
-        for i in 0..1000 {
-            match UnixStream::connect(socket_path) {
-                Ok(s) => {
-                    println!("connect_to_server: 成功连接到服务器，尝试次数: {}", i + 1);
-                    self.server_socket = Some(s);
-                    break;
-                }
-                Err(e) => {
-                    if i % 100 == 0 {
-                        println!("connect_to_server: 连接失败，重试中... (尝试次数: {}), 错误: {}", i + 1, e);
-                    }
-                    tokio::time::sleep(Duration::from_millis(50)).await;
-                }
-            }
-        }
-        
-        let socket = self.server_socket.as_ref().ok_or_else(|| {
-            println!("connect_to_server: 连接超时");
-            UintrError::Timeout
+
+        let stream = UnixStream::connect(socket_path).map_err(|e| {
+            UintrError::SocketError(format!("Failed to connect: {}", e))
         })?;
-        
-        println!("connect_to_server: 发送客户端文件描述符: {}", self.client_fd);
-        // 发送client的文件描述符给server
+        self.server_socket = Some(stream);
+        println!("connect_to_server: 成功连接到服务器");
+
+        let socket = self.server_socket.as_ref().unwrap();
+
         send_fd(socket, self.client_fd)?;
-        println!("connect_to_server: 已发送客户端文件描述符");
-        
-        println!("connect_to_server: 接收服务器文件描述符...");
-        // 接收server的文件描述符
+        println!("connect_to_server: 已发送客户端文件描述符: {}", self.client_fd);
+
         let server_fd = recv_fd(socket)?;
         println!("connect_to_server: 已接收服务器文件描述符: {}", server_fd);
         self.server_fd = Some(server_fd);
-        
+
         Ok(server_fd)
     }
 }
 
-/// 设置服务器连接（简化版）
-pub async fn setup_server_connection(
-    socket_path: &str,
-    server_fd: RawFd,
-) -> UintrResult<RawFd> {
+pub fn setup_server_connection(socket_path: &str, server_fd: RawFd) -> UintrResult<RawFd> {
     let mut conn = ServerConnection::new(server_fd);
-    conn.wait_for_client(socket_path).await
+    conn.wait_for_client(socket_path)
 }
 
-/// 设置客户端连接（简化版）
-pub async fn setup_client_connection(
-    socket_path: &str,
-    client_fd: RawFd,
-) -> UintrResult<RawFd> {
+pub fn setup_client_connection(socket_path: &str, client_fd: RawFd) -> UintrResult<RawFd> {
     let mut conn = ClientConnection::new(client_fd);
-    conn.connect_to_server(socket_path).await
+    conn.connect_to_server(socket_path)
 }

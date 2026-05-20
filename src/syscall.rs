@@ -91,12 +91,15 @@ pub fn uintr_unregister_sender(fd: RawFd) -> UintrResult<c_int> {
 }
 
 /// UINTR等待系统调用
-pub fn uintr_wait(usec: c_long, flags: c_int) -> UintrResult<()> {
+///
+/// Returns `Ok(true)` when a UINTR interrupt was received (EINTR),
+/// `Ok(false)` on timeout (no interrupt received within `usec` microseconds).
+pub fn uintr_wait(usec: c_long, flags: c_int) -> UintrResult<bool> {
     let result = unsafe { syscall(__NR_UINTR_WAIT, usec, flags) };
     if result < 0 {
         let err = std::io::Error::last_os_error();
         if err.kind() == std::io::ErrorKind::Interrupted {
-            Ok(())
+            Ok(true)
         } else {
             Err(UintrError::SyscallError(format!(
                 "uintr_wait failed: {}",
@@ -104,7 +107,7 @@ pub fn uintr_wait(usec: c_long, flags: c_int) -> UintrResult<()> {
             )))
         }
     } else {
-        Ok(())
+        Ok(false)
     }
 }
 
@@ -113,6 +116,7 @@ pub fn uintr_wait(usec: c_long, flags: c_int) -> UintrResult<()> {
 /// # Safety
 /// - The caller must ensure that the index is valid and registered
 /// - Sending to an invalid index may lead to undefined behavior
+// #[inline(never)]
 pub unsafe fn senduipi(index: u64) {
     unsafe {
         core::arch::asm!(
